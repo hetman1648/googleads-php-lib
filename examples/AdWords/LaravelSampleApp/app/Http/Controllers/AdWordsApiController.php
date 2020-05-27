@@ -21,6 +21,7 @@ namespace App\Http\Controllers;
 use Google\AdsApi\AdWords\AdWordsServices;
 use Google\AdsApi\AdWords\AdWordsSessionBuilder;
 use Google\AdsApi\AdWords\AdWordsSession;
+use Google\AdsApi\AdWords\AdGroupCriterionService;
 use Google\AdsApi\AdWords\Query\v201809\ReportQueryBuilder;
 use Google\AdsApi\AdWords\Query\v201809\ServiceQueryBuilder;
 use Google\AdsApi\AdWords\Reporting\v201809\DownloadFormat;
@@ -284,6 +285,33 @@ class AdWordsApiController extends Controller
         ];
     }
 
+    private static function changeBidForCriterionId($criterionId, $adGroupId) {
+        $adWordsServices = new AdWordsServices();
+        $session = $this->getSession();
+        $adGroupCriterionService = $adWordsServices->get($session, AdGroupCriterionService::class);
+        $operations = [];
+        $adGroupCriterion = new BiddableAdGroupCriterion();
+        // $adGroupCriterion->setAdGroupId(22622716325); // id of my adgroup
+        // $adGroupCriterion->setCriterion(new Criterion(300519082732)); // id of partition group. you can get find this id in PRODUCT_PARTITION_REPORT in ID field (which full name is Criterion ID)
+        $adGroupCriterion->setAdGroupId($adGroupId); // id of my adgroup
+        $adGroupCriterion->setCriterion(new Criterion($criterionId)); // id of partition group. you can get find this id in PRODUCT_PARTITION_REPORT in ID field (which full name is Criterion ID)
+        //
+        $bid = new CpcBid();
+        $money = new Money();
+        $money->setMicroAmount(((float)4)*1000000);
+        $bid->setBid($money);
+        $biddingStrategyConfiguration = new BiddingStrategyConfiguration();
+        $biddingStrategyConfiguration->setBids([$bid]);
+        $adGroupCriterion->setBiddingStrategyConfiguration($biddingStrategyConfiguration);
+        $operation = new AdGroupCriterionOperation();
+        $operation->setOperand($adGroupCriterion);
+        $operation->setOperator(Operator::SET);
+        $operations[] = $operation;
+        //
+        $adGroupCriterionService->mutate($operations);
+    
+    }
+
     // =====================================================================================================================    
     /**
      * runBidLandscapes
@@ -303,8 +331,8 @@ class AdWordsApiController extends Controller
         // if ($adGroupId != "76630612506") return false;
         // if ($adGroupId != "53251615365") return false;
         // if ($adGroupId != "85438336468") return false;
-        // if ($adGroupId != "38163596112") return false;
-
+        if ($adGroupId != "38163596112") return false; 
+  
         $dataService = $adWordsServices->get($session, DataService::class);
 
         $campaignId = $adGroup["campaignID"] ?? 0;       
@@ -749,9 +777,9 @@ class AdWordsApiController extends Controller
             ->withClientCustomerId("766-323-4537")
             ->build();
 
-        $campaigns        = self::getCampaigns($session);
-        $productGroups    = self::getProductPartitions($session);
-        $shoppingAdGroups = self::getShoppingAdGroups($session);
+        $campaigns        = $this->getCampaigns($session);
+        $productGroups    = $this->getProductPartitions($session);
+        $shoppingAdGroups = $this->getShoppingAdGroups($session);
 
         self::printCsvHeader();
         set_time_limit (600);
@@ -1020,7 +1048,7 @@ class AdWordsApiController extends Controller
 
         // There is no paging mechanism for reporting, so we fetch all
         // results at once.
-        $collection = self::downloadReport(
+        $collection = $this->downloadReport(
             $reportType,
             $reportRange,
             new ReportDownloader($session),
@@ -1033,9 +1061,11 @@ class AdWordsApiController extends Controller
 
             $criterionId                 = $a["criterionID"]  ?? "";
             $productGroups[$criterionId] = $a;
-            // echo "product group\n";
-            // print_r($a);
-            // exit;
+            // if ($a["impressions"] == 2899) {
+                echo "product group\n";
+                print_r($a);
+                // exit;
+            // }
         }
         return $productGroups;
 
