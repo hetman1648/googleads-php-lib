@@ -28,6 +28,11 @@ Route::match(
 );
 Route::match(
     ['get', 'post'],
+    'get-bidlandscapes',
+    'AdWordsApiController@getBidLandscapes'
+);
+Route::match(
+    ['get', 'post'],
     'download-report',
     'AdWordsApiController@downloadReportAction'
 );
